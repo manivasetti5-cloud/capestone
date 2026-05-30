@@ -1,0 +1,141 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Country {
+  id        String    @id @default(uuid())
+  code      String    @unique
+  name      String
+  states    State[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model State {
+  id              String            @id @default(uuid())
+  code            String            @unique
+  name            String
+  countryId       String
+  country         Country           @relation(fields: [countryId], references: [id])
+  districts       District[]
+  userAccessRules UserStateAccess[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model District {
+  id           String        @id @default(uuid())
+  code         String
+  name         String
+  stateId      String
+  state        State         @relation(fields: [stateId], references: [id])
+  subDistricts SubDistrict[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([stateId, code])
+}
+
+model SubDistrict {
+  id         String     @id @default(uuid())
+  code       String
+  name       String
+  districtId String
+  district   District   @relation(fields: [districtId], references: [id])
+  villages   Village[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([districtId, code])
+}
+
+model Village {
+  id            String      @id @default(uuid())
+  code          String      @unique // MDDS PLCN
+  name          String
+  subDistrictId String
+  subDistrict   SubDistrict @relation(fields: [subDistrictId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([name])
+}
+
+enum PlanType {
+  FREE
+  PREMIUM
+  PRO
+  UNLIMITED
+}
+
+enum UserStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  passwordHash     String
+  businessName     String
+  phone            String?
+  gstNumber        String?
+  planType         PlanType          @default(FREE)
+  status           UserStatus        @default(PENDING_APPROVAL)
+  role             Role              @default(USER)
+  apiKeys          ApiKey[]
+  stateAccessRules UserStateAccess[]
+  apiLogs          ApiLog[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+model ApiKey {
+  id        String   @id @default(uuid())
+  name      String
+  key       String   @unique
+  secretHash String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  status    String   @default("ACTIVE") // ACTIVE, REVOKED
+  apiLogs   ApiLog[]
+  createdAt DateTime @default(now())
+  lastUsed  DateTime?
+}
+
+model UserStateAccess {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  stateId   String
+  state     State    @relation(fields: [stateId], references: [id])
+  grantedAt DateTime @default(now())
+
+  @@unique([userId, stateId])
+}
+
+model ApiLog {
+  id           String   @id @default(uuid())
+  endpoint     String
+  responseTime Int
+  statusCode   Int
+  ipAddress    String?
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  apiKeyId     String?
+  apiKey       ApiKey?  @relation(fields: [apiKeyId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt, userId])
+}
